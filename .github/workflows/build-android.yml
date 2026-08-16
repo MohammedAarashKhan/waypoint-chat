@@ -32,14 +32,14 @@ jobs:
       - name: Prepare web assets
         run: |
           mkdir -p www
-          cp index.html manifest.json sw.js icon-180.png icon-192.png icon-512.png icon-512-maskable.png www/
+          cp index.html manifest.json sw.js icon-180.png icon-192.png icon-512.png icon-512-maskable.png key-access.js www/
 
       - name: Initialize Capacitor
         run: npx cap init "Waypoint" "com.mohammedaarash.waypoint" --web-dir www
 
-      - name: Configure Capacitor for production web app
+      - name: Configure Capacitor for local APK assets
         run: |
-          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('capacitor.config.json','utf8')); p.server={url:'https://waypoint-chat-olive.vercel.app',cleartext:false}; fs.writeFileSync('capacitor.config.json',JSON.stringify(p,null,2));"
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('capacitor.config.json','utf8')); delete p.server; fs.writeFileSync('capacitor.config.json',JSON.stringify(p,null,2));"
 
       - name: Recreate Android platform
         run: |
