@@ -4,9 +4,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    // Primary secret name. The fallback keeps compatibility with the
+    // previously-created Vercel variable named `name` without exposing it.
+    const apiKey = process.env.ANTHROPIC_API_KEY || process.env.name;
     if (!apiKey) {
-      return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not configured on the server.' });
+      return res.status(500).json({ error: 'Anthropic API key is not configured in Vercel Production environment variables.' });
     }
 
     const { messages } = req.body || {};
