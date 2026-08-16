@@ -4,11 +4,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Primary secret name. The fallback keeps compatibility with the
-    // previously-created Vercel variable named `name` without exposing it.
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.name;
     if (!apiKey) {
-      return res.status(500).json({ error: 'Anthropic API key is not configured in Vercel Production environment variables.' });
+      return res.status(500).json({
+        error: 'Anthropic API key is not configured in Vercel Production environment variables.'
+      });
     }
 
     const { messages } = req.body || {};
@@ -30,10 +30,28 @@ export default async function handler(req, res) {
       })
     });
 
-    const data = await response.json();
-    return res.status(response.status).json(data);
+    const raw = await response.text();
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = { error: raw || 'Empty response from Anthropic.' };
+    }
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: 'Anthropic API request failed.',
+        status: response.status,
+        details: data
+      });
+    }
+
+    return res.status(200).json(data);
   } catch (error) {
     console.error('Waypoint AI error:', error);
-    return res.status(500).json({ error: 'Unable to reach the AI service.' });
+    return res.status(500).json({
+      error: 'Unable to reach the AI service.',
+      details: error instanceof Error ? error.message : String(error)
+    });
   }
 }
