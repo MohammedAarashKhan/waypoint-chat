@@ -11,20 +11,32 @@ export default async function handler(req, res) {
       });
     }
 
-    const { messages } = req.body || {};
-    if (!Array.isArray(messages) || messages.length === 0) {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+    const incomingMessages = body.messages;
+
+    if (!Array.isArray(incomingMessages) || incomingMessages.length === 0) {
       return res.status(400).json({ error: 'messages must be a non-empty array.' });
     }
+
+    const messages = incomingMessages.map((message) => ({
+      role: message.role === 'assistant' ? 'assistant' : 'user',
+      content: typeof message.content === 'string'
+        ? message.content
+        : Array.isArray(message.content)
+          ? message.content
+          : String(message.content ?? '')
+    }));
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        'accept': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
         messages
       })
