@@ -1,66 +1,62 @@
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.name;
     if (!apiKey) {
-      return res.status(500).json({ error: 'Anthropic API key is not configured in Vercel Production environment variables.' });
+      return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not configured in Vercel Production.' });
     }
 
-    // Vercel normally parses application/json into req.body automatically.
-    // Handle object, string, and Buffer bodies safely.
     let body = req.body;
     if (Buffer.isBuffer(body)) body = body.toString('utf8');
     if (typeof body === 'string') {
-      try {
-        body = JSON.parse(body);
-      } catch (parseError) {
-        return res.status(400).json({ error: 'Invalid JSON request body.', details: parseError.message });
-      }
+      try { body = JSON.parse(body); }
+      catch (e) { return res.status(400).json({ error: 'Invalid JSON request body.', details: e.message }); }
     }
-    body = body || {};
 
-    const incomingMessages = body.messages;
+    const incomingMessages = body?.messages;
     if (!Array.isArray(incomingMessages) || incomingMessages.length === 0) {
       return res.status(400).json({ error: 'messages must be a non-empty array.' });
     }
 
-    const messages = incomingMessages.map((message) => ({
-      role: message.role === 'assistant' ? 'assistant' : 'user',
-      content: typeof message.content === 'string'
-        ? message.content
-        : Array.isArray(message.content)
-          ? message.content
-          : String(message.content ?? '')
-    }));
+    const messages = incomingMessages.map((m) => ({
+      role: m?.role === 'assistant' ? 'assistant' : 'user',
+      content: typeof m?.content === 'string' ? m.content : String(m?.content ?? '')
+    })).filter(m => m.content.trim());
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    if (!messages.length) return res.status(400).json({ error: 'No usable messages supplied.' });
+
+    const upstream = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
-        'accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
+        max_tokens: 1200,
         messages
       })
     });
 
-    const raw = await response.text();
+    const raw = await upstream.text();
     let data;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      data = { error: raw || 'Empty response from Anthropic.' };
+    try { data = JSON.parse(raw); }
+    catch (e) {
+      console.error('Anthropic non-JSON response:', upstream.status, raw.slice(0, 500));
+      return res.status(502).json({ error: 'AI provider returned a non-JSON response.', status: upstream.status, details: raw.slice(0, 300) });
     }
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: 'Anthropic API request failed.', status: response.status, details: data });
+    if (!upstream.ok) {
+      console.error('Anthropic API error:', upstream.status, data);
+      return res.status(502).json({ error: 'Anthropic API request failed.', status: upstream.status, details: data?.error?.message || data });
     }
 
     return res.status(200).json(data);
