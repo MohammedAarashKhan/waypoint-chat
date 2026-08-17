@@ -33,6 +33,14 @@ jobs:
         run: |
           mkdir -p www
           cp index.html manifest.json sw.js icon-180.png icon-192.png icon-512.png icon-512-maskable.png key-access.js www/
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('www/index.html')
+          s=p.read_text()
+          if 'src="key-access.js"' not in s:
+              s=s.replace('</body>', '<script src="key-access.js"></script></body>')
+          p.write_text(s)
+          PY
 
       - name: Initialize Capacitor
         run: npx cap init "Waypoint" "com.mohammedaarash.waypoint" --web-dir www
@@ -68,6 +76,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Waypoint-Full-Working-APK
+          name: Waypoint-Direct-Claude-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
