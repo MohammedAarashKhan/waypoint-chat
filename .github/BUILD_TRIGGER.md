@@ -1,0 +1,1 @@
+Fresh APK build trigger for the latest Waypoint provider fixes.
